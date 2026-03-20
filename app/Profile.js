@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import {
+  Alert,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,81 +10,123 @@ import {
   View,
 } from "react-native";
 
-const Profile = ({ user, onLogout }) => {
+const DEFAULT_IMAGE = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+const Profile = ({ navigation, currentUser, onSave }) => {
+  const [name, setName] = useState(currentUser.name);
+  const [address, setAddress] = useState(currentUser.address);
+  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl);
+  const [desc, setDesc] = useState(currentUser.description);
+
+  const handleSave = () => {
+    onSave({ ...currentUser, name, address, avatarUrl, description: desc });
+    Alert.alert("Success", "Information saved!");
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.navBar}>
-        <TouchableOpacity onPress={onLogout}>
-          <Text style={styles.backLink}>{"< Login"}</Text>
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>Profile</Text>
-        <View style={{ width: 50 }} />
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.textContainer}>
+          <Text style={styles.welcomeText} numberOfLines={2}>
+            {name}!
+          </Text>
+        </View>
+        <View style={styles.avatarFrame}>
+          <Image
+            source={{ uri: avatarUrl || DEFAULT_IMAGE }}
+            style={styles.avatarImg}
+          />
+        </View>
       </View>
-      <Text style={styles.headerTitle}>Profile</Text>
+
       <View style={styles.form}>
-        <Text style={styles.label}>Username</Text>
-        <TextInput style={styles.input} value={user.name} editable={false} />
+        <Text style={styles.label}>Name</Text>
+        <TextInput style={styles.input} value={name} onChangeText={setName} />
         <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} value={user.email} editable={false} />
-        <Text style={styles.label}>Phone</Text>
-        <TextInput style={styles.input} value="0123456789" editable={false} />
-        <Text style={styles.label}>Date of Birth</Text>
-        <TextInput style={styles.input} value="1990-01-01" editable={false} />
+        <TextInput
+          style={[styles.input, { backgroundColor: "#eee" }]}
+          value={currentUser.email}
+          editable={false}
+        />
+        <Text style={styles.label}>User ID</Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: "#eee" }]}
+          value={currentUser.userId}
+          editable={false}
+        />
         <Text style={styles.label}>Address</Text>
         <TextInput
           style={styles.input}
-          value="123 Main St, City, Country"
-          editable={false}
+          value={address}
+          placeholder="XXXXXXXX"
+          onChangeText={setAddress}
+        />
+        <Text style={styles.label}>Avatar URL</Text>
+        <TextInput
+          style={styles.input}
+          value={avatarUrl}
+          placeholder="http://link.to/image.png"
+          onChangeText={setAvatarUrl}
         />
         <Text style={styles.label}>Description</Text>
         <TextInput
-          style={[styles.input, { height: 80 }]}
-          value="A passionate developer and tech enthusiast"
+          style={[styles.input, { height: 100, textAlignVertical: "top" }]}
+          value={desc}
           multiline
-          editable={false}
+          onChangeText={setDesc}
         />
       </View>
-      <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.footerBtn} onPress={handleSave}>
+          <Text style={styles.btnText}>Save</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.footerBtn}
+          onPress={() => navigation.popToTop()}
+        >
+          <Text style={styles.btnText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFFFFF", paddingHorizontal: 20 },
-  navBar: {
+  container: { padding: 30, backgroundColor: "white", flexGrow: 1 },
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginTop: 50,
     alignItems: "center",
+    marginTop: 30,
   },
-  backLink: { color: "#007AFF", fontSize: 17 },
-  navTitle: { fontSize: 17, fontWeight: "600" },
-  headerTitle: {
-    fontSize: 34,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginTop: 20,
-  },
+  textContainer: { flex: 1, marginRight: 10 },
+  welcomeText: { fontSize: 40, fontWeight: "bold" },
+  avatarFrame: { width: 90, height: 90, borderWidth: 2, borderColor: "black" },
+  avatarImg: { width: "100%", height: "100%" },
   form: { marginTop: 10 },
-  label: { fontSize: 15, color: "#8E8E93", marginTop: 15, marginBottom: 5 },
+  label: { fontSize: 16, fontWeight: "bold", marginTop: 12 },
   input: {
-    backgroundColor: "#F2F2F7",
-    borderRadius: 10,
-    padding: 12,
+    borderWidth: 1,
+    borderColor: "black",
+    padding: 10,
+    marginTop: 5,
     fontSize: 16,
-    color: "#000",
   },
-  logoutBtn: {
-    backgroundColor: "#FF6B6B",
-    borderRadius: 12,
-    padding: 16,
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 40,
-    marginBottom: 40,
+    marginBottom: 30,
+  },
+  footerBtn: {
+    borderWidth: 1,
+    borderColor: "black",
+    width: "45%",
+    paddingVertical: 12,
     alignItems: "center",
   },
-  logoutText: { color: "white", fontWeight: "bold", fontSize: 17 },
+  btnText: { fontSize: 18 },
 });
 
 export default Profile;
