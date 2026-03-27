@@ -12,16 +12,11 @@ import {
 
 const DEFAULT_IMAGE = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
-const Profile = ({ navigation, currentUser, onSave }) => {
+const Profile = ({ currentUser, onSave }) => {
   const [name, setName] = useState(currentUser.name);
-  const [address, setAddress] = useState(currentUser.address);
-  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl);
-  const [desc, setDesc] = useState(currentUser.description);
-
-  const handleSave = () => {
-    onSave({ ...currentUser, name, address, avatarUrl, description: desc });
-    Alert.alert("Success", "Information saved!");
-  };
+  const [address, setAddress] = useState(currentUser.address || "");
+  const [avatarUrl, setAvatarUrl] = useState(currentUser.avatarUrl || "");
+  const [desc, setDesc] = useState(currentUser.description || "");
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -38,7 +33,6 @@ const Profile = ({ navigation, currentUser, onSave }) => {
           />
         </View>
       </View>
-
       <View style={styles.form}>
         <Text style={styles.label}>Name</Text>
         <TextInput style={styles.input} value={name} onChangeText={setName} />
@@ -46,12 +40,6 @@ const Profile = ({ navigation, currentUser, onSave }) => {
         <TextInput
           style={[styles.input, { backgroundColor: "#eee" }]}
           value={currentUser.email}
-          editable={false}
-        />
-        <Text style={styles.label}>User ID</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: "#eee" }]}
-          value={currentUser.userId}
           editable={false}
         />
         <Text style={styles.label}>Address</Text>
@@ -65,7 +53,7 @@ const Profile = ({ navigation, currentUser, onSave }) => {
         <TextInput
           style={styles.input}
           value={avatarUrl}
-          placeholder="http://link.to/image.png"
+          placeholder="http://link.png"
           onChangeText={setAvatarUrl}
         />
         <Text style={styles.label}>Description</Text>
@@ -76,57 +64,64 @@ const Profile = ({ navigation, currentUser, onSave }) => {
           onChangeText={setDesc}
         />
       </View>
-
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.footerBtn} onPress={handleSave}>
-          <Text style={styles.btnText}>Save</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.footerBtn}
-          onPress={() => navigation.popToTop()}
-        >
-          <Text style={styles.btnText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={styles.saveBtn}
+        onPress={() => {
+          onSave({
+            ...currentUser,
+            name,
+            address,
+            avatarUrl,
+            description: desc,
+          });
+          Alert.alert("Success", "Saved!");
+        }}
+      >
+        <Text style={{ fontWeight: "bold", color: "white" }}>Save Changes</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 30, backgroundColor: "white", flexGrow: 1 },
+  container: {
+    padding: 30,
+    backgroundColor: "white",
+    flexGrow: 1,
+    paddingTop: 60,
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 30,
   },
   textContainer: { flex: 1, marginRight: 10 },
   welcomeText: { fontSize: 40, fontWeight: "bold" },
-  avatarFrame: { width: 90, height: 90, borderWidth: 2, borderColor: "black" },
-  avatarImg: { width: "100%", height: "100%" },
-  form: { marginTop: 10 },
-  label: { fontSize: 16, fontWeight: "bold", marginTop: 12 },
-  input: {
+  avatarFrame: {
+    width: 90,
+    height: 90,
     borderWidth: 1,
-    borderColor: "black",
-    padding: 10,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  avatarImg: { width: "100%", height: "100%" },
+  form: { marginTop: 20 },
+  label: { fontSize: 14, color: "gray", marginTop: 15 },
+  input: {
+    backgroundColor: "#f2f2f7",
+    borderRadius: 10,
+    padding: 12,
     marginTop: 5,
     fontSize: 16,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 40,
-    marginBottom: 30,
-  },
-  footerBtn: {
-    borderWidth: 1,
-    borderColor: "black",
-    width: "45%",
-    paddingVertical: 12,
+  saveBtn: {
+    backgroundColor: "#007aff",
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 30,
     alignItems: "center",
   },
-  btnText: { fontSize: 18 },
 });
 
 export default Profile;

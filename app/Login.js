@@ -18,7 +18,7 @@ const Login = ({ navigation, listUsers, setCurrentUser }) => {
     );
     if (user) {
       setCurrentUser(user);
-      navigation.navigate("Home");
+      navigation.replace("Main");
     } else {
       Alert.alert("Error", "Invalid email or password!");
     }
@@ -47,7 +47,7 @@ const Login = ({ navigation, listUsers, setCurrentUser }) => {
         <TouchableOpacity>
           <Text style={styles.navText}>Forgot password?</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+        <TouchableOpacity onPress={() => navigation.replace("Register")}>
           <Text style={styles.navText}>Register</Text>
         </TouchableOpacity>
       </View>

@@ -33,7 +33,7 @@ const Register = ({ navigation, onRegister }) => {
       return;
     }
     onRegister({ userId: generateID(), name, email, password: pass });
-    navigation.goBack();
+    navigation.replace("Login");
   };
 
   return (
@@ -72,7 +72,7 @@ const Register = ({ navigation, onRegister }) => {
         <Text style={styles.buttonText}>Create</Text>
       </TouchableOpacity>
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+        onPress={() => navigation.replace("Login")}
         style={{ marginTop: 20 }}
       >
         <Text style={{ textDecorationLine: "underline" }}>
