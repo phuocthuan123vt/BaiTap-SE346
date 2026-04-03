@@ -8,21 +8,18 @@ import {
   View,
 } from "react-native";
 
-const Login = ({ navigation, listUsers, setCurrentUser }) => {
+const Login = ({ navigation, listUsers, setCurrentUser, onLogin }) => {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
 
-  const handleSignIn = () => {
-    const user = listUsers.find(
-      (u) => u.email === email && u.password === pass,
-    );
-    if (user) {
-      setCurrentUser(user);
+  const handleSignIn = async () => { 
+    const success = await onLogin(email, pass);
+    if (success) {
       navigation.replace("Main");
     } else {
       Alert.alert("Error", "Invalid email or password!");
     }
-  };
+};
 
   return (
     <View style={styles.container}>

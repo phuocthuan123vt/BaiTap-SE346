@@ -1,28 +1,27 @@
 import React from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
 
 const Settings = ({ navigation, onLogout }) => {
+  
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to log out?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Logout",
-        onPress: async () => {
-          // 1. Gọi hàm onLogout ở index.js để xóa currentUser trong AsyncStorage
-          await onLogout();
-
-          // 2. Reset Stack điều hướng để quay về Login và xóa sạch lịch sử các màn hình trước
-          navigation.reset({
-            index: 0,
-            routes: [{ name: "Login" }],
-          });
-        },
-        style: "destructive",
-      },
-    ]);
+    Alert.alert(
+      "Logout",
+      "Do you want to log out of this account?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Logout",
+          onPress: () => {
+            onLogout();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Login" }],
+            });
+          },
+          style: "destructive"
+        }
+      ]
+    );
   };
 
   return (
@@ -30,11 +29,10 @@ const Settings = ({ navigation, onLogout }) => {
       <Text style={styles.title}>Settings</Text>
 
       <View style={styles.menuContainer}>
+        {/* Nút Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout Account</Text>
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-
-        <Text style={styles.versionText}>App Version 1.0.0</Text>
       </View>
     </View>
   );
@@ -44,43 +42,40 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "white",
-    padding: 25,
+    padding: 30,
     justifyContent: "center",
   },
   title: {
     fontSize: 32,
     fontWeight: "bold",
-    marginBottom: 50,
+    marginBottom: 60,
     textAlign: "center",
-    color: "#1c1e21",
   },
   menuContainer: {
     width: "100%",
     alignItems: "center",
   },
   logoutBtn: {
-    backgroundColor: "#ff3b30", // Màu đỏ đặc trưng của nút Logout
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    width: "100%",
+    borderWidth: 2,
+    borderColor: "black",
+    paddingVertical: 15,
+    paddingHorizontal: 60,
     alignItems: "center",
-    // Hiệu ứng đổ bóng nhẹ cho nút
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
   logoutText: {
-    color: "white",
+    fontSize: 20,
     fontWeight: "bold",
-    fontSize: 18,
+    color: "red",
+  },
+  dbInfo: {
+    marginTop: 40,
+    fontSize: 12,
+    color: "gray",
   },
   versionText: {
-    marginTop: 20,
-    color: "gray",
+    marginTop: 10,
     fontSize: 12,
+    color: "gray",
   },
 });
 

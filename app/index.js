@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { NavigationContainer, NavigationIndependentTree } from "@react-navigation/native";
-import { createStackNavigator } from "@react-navigation/stack";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage'; // IMPORT MỚI
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import {
+  NavigationContainer,
+  NavigationIndependentTree,
+} from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import * as SQLite from "expo-sqlite";
+import React, { useEffect, useState } from "react";
 
 import Home from "./Home";
 import Login from "./Login";
@@ -14,114 +17,157 @@ import Settings from "./Settings";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Các Key để lưu vào bộ nhớ
-const USERS_KEY = "@list_users";
-const POSTS_KEY = "@list_posts";
-const CURRENT_USER_KEY = "@current_user";
-
 export default function App() {
-  const [listUsers, setListUsers] = useState([]);
+  const [db, setDb] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [listPosts, setListPosts] = useState([]);
+  const [listComments, setListComments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. LOAD DỮ LIỆU KHI MỞ APP
+  const generateRandomText = (length) => {
+    const chars = "abcdefghijklmnopqrstuvwxyz  ";
+    let res = "";
+    for (let i = 0; i < length; i++)
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    return res;
+  };
+
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        const savedUsers = await AsyncStorage.getItem(USERS_KEY);
-        const savedPosts = await AsyncStorage.getItem(POSTS_KEY);
-        const savedCurrent = await AsyncStorage.getItem(CURRENT_USER_KEY);
+    async function initDB() {
+      const database = await SQLite.openDatabaseAsync("social_app_v2.db");
+      setDb(database);
 
-        if (savedUsers) setListUsers(JSON.parse(savedUsers));
-        
-        // Nếu đã có bài post cũ thì load, nếu chưa có thì tạo mới 15 bài ngẫu nhiên
-        if (savedPosts) {
-          setListPosts(JSON.parse(savedPosts));
-        } else {
-          generateFakePosts(); 
-        }
+      await database.execAsync(`
+        CREATE TABLE IF NOT EXISTS users (
+          userId TEXT PRIMARY KEY, 
+          name TEXT, email TEXT, 
+          password TEXT, address TEXT, 
+          avatarUrl TEXT, description TEXT
+        );
+        CREATE TABLE IF NOT EXISTS posts (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, 
+          userId TEXT, description TEXT, 
+          timeValue INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS comments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          postId INTEGER,
+          userId TEXT,
+          content TEXT,
+          timeValue INTEGER
+        );
+      `);
 
-        if (savedCurrent) setCurrentUser(JSON.parse(savedCurrent));
-      } catch (e) {
-        console.error("Failed to load data", e);
-      } finally {
-        setIsLoading(false);
+      const firstUser = await database.getFirstAsync("SELECT * FROM users");
+      if (!firstUser) {
+        await seedInitialData(database);
       }
-    };
-    loadInitialData();
+
+      await refreshData(database);
+      setIsLoading(false);
+    }
+    initDB();
   }, []);
 
-  // Hàm tạo dữ liệu giả (chỉ dùng nếu bộ nhớ trống)
-  const generateFakePosts = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    const generateID = () => {
-      let res = "";
-      for (let i = 0; i < 8; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
-      return res;
-    };
-    const generateText = (len) => {
-      const c = "abcdefghijklmnopqrstuvwxyz ";
-      let res = "";
-      for (let i = 0; i < len; i++) res += c.charAt(Math.floor(Math.random() * c.length));
-      return res;
-    };
-
-    let tempPosts = [];
-    for (let i = 0; i < 3; i++) {
-      const fakeId = generateID();
-      for (let j = 0; j < 5; j++) {
-        tempPosts.push({
-          id: Math.random().toString(),
-          userId: fakeId,
-          description: generateText(60),
-          timeValue: Date.now() - Math.floor(Math.random() * 1000000000),
-        });
-      }
+  const seedInitialData = async (database) => {
+    const uId = "ADMIN888";
+    await database.runAsync(
+      "INSERT INTO users (userId, name, email, password) VALUES (?, ?, ?, ?)",
+      [uId, "Admin User", "admin@test.com", "1234"],
+    );
+    for (let j = 0; j < 5; j++) {
+      await database.runAsync(
+        "INSERT INTO posts (userId, description, timeValue) VALUES (?, ?, ?)",
+        [
+          uId,
+          "Welcome to our new social network! (Seed post)",
+          Date.now() - j * 1000,
+        ],
+      );
     }
-    tempPosts.sort((a, b) => b.timeValue - a.timeValue);
-    setListPosts(tempPosts);
-    AsyncStorage.setItem(POSTS_KEY, JSON.stringify(tempPosts)); // Lưu luôn vào storage
   };
 
-  // 2. CÁC HÀM XỬ LÝ DỮ LIỆU (CÓ LƯU VÀO ASYNC STORAGE)
+  const refreshData = async (database) => {
+    const allPosts = await database.getAllAsync(
+      "SELECT * FROM posts ORDER BY timeValue DESC",
+    );
+    const allComments = await database.getAllAsync(
+      "SELECT * FROM comments ORDER BY timeValue ASC",
+    );
+    setListPosts(allPosts);
+    setListComments(allComments);
+  };
+
   const handleRegister = async (newUser) => {
-    const updatedUsers = [...listUsers, { ...newUser, address: "", avatarUrl: "", description: "" }];
-    setListUsers(updatedUsers);
-    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+    if (!db) return;
+    await db.runAsync(
+      "INSERT INTO users (userId, name, email, password, address, avatarUrl, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [
+        newUser.userId,
+        newUser.name,
+        newUser.email,
+        newUser.password,
+        "",
+        "",
+        "",
+      ],
+    );
+
+    for (let i = 0; i < 5; i++) {
+      await db.runAsync(
+        "INSERT INTO posts (userId, description, timeValue) VALUES (?, ?, ?)",
+        [newUser.userId, generateRandomText(60), Date.now() - i * 1000],
+      );
+    }
+    await refreshData(db);
   };
 
-  const handleUpdateUser = async (updatedInfo) => {
-    const newList = listUsers.map((u) => u.email === updatedInfo.email ? updatedInfo : u);
-    setListUsers(newList);
-    setCurrentUser(updatedInfo);
-    await AsyncStorage.setItem(USERS_KEY, JSON.stringify(newList));
-    await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedInfo));
+  const handleLogin = async (email, password) => {
+    const user = await db.getFirstAsync(
+      "SELECT * FROM users WHERE email = ? AND password = ?",
+      [email, password],
+    );
+    if (user) {
+      setCurrentUser(user);
+      return true;
+    }
+    return false;
   };
 
   const handleAddPost = async (content) => {
-    if (!currentUser) return;
-    const newPost = {
-      id: Date.now().toString(),
-      userId: currentUser?.userId || "Unknown",
-      description: content,
-      timeValue: Date.now(),
-    };
-    const updatedPosts = [newPost, ...listPosts];
-    setListPosts(updatedPosts);
-    await AsyncStorage.setItem(POSTS_KEY, JSON.stringify(updatedPosts));
+    if (!currentUser || !db) return;
+    await db.runAsync(
+      "INSERT INTO posts (userId, description, timeValue) VALUES (?, ?, ?)",
+      [currentUser.userId, content, Date.now()],
+    );
+    await refreshData(db);
   };
 
-  const handleSetCurrentUser = async (user) => {
-    setCurrentUser(user);
-    if (user) {
-      await AsyncStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
-    } else {
-      await AsyncStorage.removeItem(CURRENT_USER_KEY);
-    }
+  const handleAddComment = async (postId, content) => {
+    if (!currentUser || !db) return;
+    await db.runAsync(
+      "INSERT INTO comments (postId, userId, content, timeValue) VALUES (?, ?, ?, ?)",
+      [postId, currentUser.userId, content, Date.now()],
+    );
+    await refreshData(db);
   };
 
-  if (isLoading) return null; // Hoặc một màn hình Loading
+  const handleUpdateUser = async (updatedInfo) => {
+    if (!db) return;
+    await db.runAsync(
+      "UPDATE users SET name = ?, address = ?, avatarUrl = ?, description = ? WHERE userId = ?",
+      [
+        updatedInfo.name,
+        updatedInfo.address,
+        updatedInfo.avatarUrl,
+        updatedInfo.description,
+        updatedInfo.userId,
+      ],
+    );
+    setCurrentUser(updatedInfo);
+  };
+
+  if (isLoading) return null;
 
   function MainTabs() {
     return (
@@ -129,8 +175,19 @@ export default function App() {
         screenOptions={({ route }) => ({
           headerShown: false,
           tabBarIcon: ({ focused, color, size }) => {
-            let iconName = route.name === "Home" ? "home" : route.name === "Profile" ? "person" : "settings";
-            return <Ionicons name={focused ? iconName : iconName + "-outline"} size={size} color={color} />;
+            let iconName =
+              route.name === "Home"
+                ? "home"
+                : route.name === "Profile"
+                  ? "person"
+                  : "settings";
+            return (
+              <Ionicons
+                name={focused ? iconName : iconName + "-outline"}
+                size={size}
+                color={color}
+              />
+            );
           },
           tabBarActiveTintColor: "#1877f2",
           tabBarInactiveTintColor: "gray",
@@ -138,13 +195,31 @@ export default function App() {
         })}
       >
         <Tab.Screen name="Home">
-          {(props) => <Home {...props} listPosts={listPosts} currentUser={currentUser} onPost={handleAddPost} />}
+          {(props) => (
+            <Home
+              {...props}
+              listPosts={listPosts}
+              listComments={listComments}
+              currentUser={currentUser}
+              onPost={handleAddPost}
+              onComment={handleAddComment}
+            />
+          )}
         </Tab.Screen>
         <Tab.Screen name="Profile">
-          {(props) => <Profile key={currentUser?.email} {...props} currentUser={currentUser} onSave={handleUpdateUser} />}
+          {(props) => (
+            <Profile
+              key={currentUser?.userId}
+              {...props}
+              currentUser={currentUser}
+              onSave={handleUpdateUser}
+            />
+          )}
         </Tab.Screen>
         <Tab.Screen name="Settings">
-          {(props) => <Settings {...props} onLogout={() => handleSetCurrentUser(null)} />}
+          {(props) => (
+            <Settings {...props} onLogout={() => setCurrentUser(null)} />
+          )}
         </Tab.Screen>
       </Tab.Navigator>
     );
@@ -153,10 +228,9 @@ export default function App() {
   return (
     <NavigationIndependentTree>
       <NavigationContainer>
-        {/* Nếu đã có user trong storage thì vào thẳng Main (Auto-login) */}
-        <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={currentUser ? "Main" : "Login"}>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login">
-            {(props) => <Login {...props} listUsers={listUsers} setCurrentUser={handleSetCurrentUser} />}
+            {(props) => <Login {...props} onLogin={handleLogin} />}
           </Stack.Screen>
           <Stack.Screen name="Register">
             {(props) => <Register {...props} onRegister={handleRegister} />}
