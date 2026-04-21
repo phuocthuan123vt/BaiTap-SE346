@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -8,18 +7,17 @@ import {
   View,
 } from "react-native";
 
-const Login = ({ navigation, listUsers, setCurrentUser, onLogin }) => {
+const Login = ({ navigation, onLogin, isLoading }) => {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
 
-  const handleSignIn = async () => { 
+  const handleSignIn = async () => {
+    if (isLoading) return;
     const success = await onLogin(email, pass);
     if (success) {
       navigation.replace("Main");
-    } else {
-      Alert.alert("Error", "Invalid email or password!");
     }
-};
+  };
 
   return (
     <View style={styles.container}>
@@ -35,21 +33,24 @@ const Login = ({ navigation, listUsers, setCurrentUser, onLogin }) => {
         <Text style={styles.label}>Password</Text>
         <TextInput
           style={styles.textInputZone}
-          placeholder=" ●   ●   ●   ● "
+          placeholder="● ● ● ●"
           secureTextEntry
           onChangeText={setPass}
         />
       </View>
       <View style={styles.navigate}>
-        <TouchableOpacity>
-          <Text style={styles.navText}>Forgot password?</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.replace("Register")}>
-          <Text style={styles.navText}>Register</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+          <Text style={styles.navText}>Register Now</Text>
         </TouchableOpacity>
       </View>
-      <TouchableOpacity style={styles.button} onPress={handleSignIn}>
-        <Text style={styles.buttonText}>Sign in</Text>
+      <TouchableOpacity
+        style={[styles.button, { opacity: isLoading ? 0.5 : 1 }]}
+        onPress={handleSignIn}
+        disabled={isLoading}
+      >
+        <Text style={styles.buttonText}>
+          {isLoading ? "Loading..." : "Sign in"}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -62,39 +63,29 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "white",
   },
-  title: { fontSize: 60, marginBottom: 40 },
+  title: { fontSize: 60, marginBottom: 40, fontWeight: "bold" },
   form: { width: "100%" },
-  label: { fontSize: 16, marginTop: 45, marginLeft: 35, fontWeight: "bold" },
+  label: { fontSize: 16, marginTop: 40, marginLeft: 35, fontWeight: "bold" },
   textInputZone: {
     width: "80%",
     borderWidth: 3,
     borderColor: "black",
     paddingHorizontal: 10,
-    height: 40,
+    height: 45,
     marginLeft: 35,
-    marginTop: 15,
+    marginTop: 10,
     fontWeight: "bold",
   },
-  navigate: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "88%",
-    marginRight: 46,
-  },
-  navText: {
-    marginTop: 15,
-    marginLeft: 35,
-    fontSize: 13,
-    textDecorationLine: "underline",
-  },
+  navigate: { width: "80%", alignItems: "flex-end", marginTop: 10 },
+  navText: { fontSize: 14, textDecorationLine: "underline", color: "blue" },
   button: {
-    marginTop: 30,
+    marginTop: 40,
     borderWidth: 3,
     borderColor: "black",
-    paddingHorizontal: 35,
-    paddingVertical: 5,
+    paddingHorizontal: 40,
+    paddingVertical: 10,
   },
-  buttonText: { fontSize: 20, fontWeight: "bold" },
+  buttonText: { fontSize: 22, fontWeight: "bold" },
 });
 
 export default Login;

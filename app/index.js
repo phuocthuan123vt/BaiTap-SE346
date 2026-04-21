@@ -5,8 +5,8 @@ import {
   NavigationIndependentTree,
 } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import * as SQLite from "expo-sqlite";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { Alert } from "react-native";
 
 import Home from "./Home";
 import Login from "./Login";
@@ -16,158 +16,162 @@ import Settings from "./Settings";
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+const BASE_URL = "http://blackntt.net:4321";
 
 export default function App() {
-  const [db, setDb] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [listPosts, setListPosts] = useState([]);
-  const [listComments, setListComments] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const generateRandomText = (length) => {
-    const chars = "abcdefghijklmnopqrstuvwxyz  ";
-    let res = "";
-    for (let i = 0; i < length; i++)
-      res += chars.charAt(Math.floor(Math.random() * chars.length));
-    return res;
-  };
+  // KIỂM TRA DÒNG NÀY: Phải có setIsLoading
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    async function initDB() {
-      const database = await SQLite.openDatabaseAsync("social_app_v2.db");
-      setDb(database);
-
-      await database.execAsync(`
-        CREATE TABLE IF NOT EXISTS users (
-          userId TEXT PRIMARY KEY, 
-          name TEXT, email TEXT, 
-          password TEXT, address TEXT, 
-          avatarUrl TEXT, description TEXT
-        );
-        CREATE TABLE IF NOT EXISTS posts (
-          id INTEGER PRIMARY KEY AUTOINCREMENT, 
-          userId TEXT, description TEXT, 
-          timeValue INTEGER
-        );
-        CREATE TABLE IF NOT EXISTS comments (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          postId INTEGER,
-          userId TEXT,
-          content TEXT,
-          timeValue INTEGER
-        );
-      `);
-
-      const firstUser = await database.getFirstAsync("SELECT * FROM users");
-      if (!firstUser) {
-        await seedInitialData(database);
-      }
-
-      await refreshData(database);
-      setIsLoading(false);
+  const fetchAllPosts = async () => {
+    try {
+      const response = await fetch(`${BASE_URL}/posts`);
+      const data = await response.json();
+      setListPosts(data);
+    } catch (error) {
+      console.log("Fetch posts error:", error);
     }
-    initDB();
-  }, []);
-
-  const seedInitialData = async (database) => {
-    const uId = "ADMIN888";
-    await database.runAsync(
-      "INSERT INTO users (userId, name, email, password) VALUES (?, ?, ?, ?)",
-      [uId, "Admin User", "admin@test.com", "1234"],
-    );
-    for (let j = 0; j < 5; j++) {
-      await database.runAsync(
-        "INSERT INTO posts (userId, description, timeValue) VALUES (?, ?, ?)",
-        [
-          uId,
-          "Welcome to our new social network! (Seed post)",
-          Date.now() - j * 1000,
-        ],
-      );
-    }
-  };
-
-  const refreshData = async (database) => {
-    const allPosts = await database.getAllAsync(
-      "SELECT * FROM posts ORDER BY timeValue DESC",
-    );
-    const allComments = await database.getAllAsync(
-      "SELECT * FROM comments ORDER BY timeValue ASC",
-    );
-    setListPosts(allPosts);
-    setListComments(allComments);
-  };
-
-  const handleRegister = async (newUser) => {
-    if (!db) return;
-    await db.runAsync(
-      "INSERT INTO users (userId, name, email, password, address, avatarUrl, description) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [
-        newUser.userId,
-        newUser.name,
-        newUser.email,
-        newUser.password,
-        "",
-        "",
-        "",
-      ],
-    );
-
-    for (let i = 0; i < 5; i++) {
-      await db.runAsync(
-        "INSERT INTO posts (userId, description, timeValue) VALUES (?, ?, ?)",
-        [newUser.userId, generateRandomText(60), Date.now() - i * 1000],
-      );
-    }
-    await refreshData(db);
   };
 
   const handleLogin = async (email, password) => {
-    const user = await db.getFirstAsync(
-      "SELECT * FROM users WHERE email = ? AND password = ?",
-      [email, password],
-    );
-    if (user) {
-      setCurrentUser(user);
-      return true;
+    try {
+      setIsLoading(true);
+      const response = await fetch(
+        `${BASE_URL}/login?email=${email}&password=${password}`,
+        {
+          method: "POST",
+          headers: { accept: "application/json" },
+        },
+      );
+
+      const loginData = await response.json();
+
+      if (response.ok) {
+        // Cố gắng lấy Profile chi tiết
+        const profileRes = await fetch(`${BASE_URL}/profile/${email}`);
+        const profileData = await profileRes.json();
+
+        // MẸO CỨU CÁNH: Nếu Profile bị "Not Found", ta tự xây dựng currentUser từ dữ liệu Login
+        if (!profileRes.ok || profileData.detail === "Not Found") {
+          console.log(
+            "MẸO: Server lỗi Profile, tự tạo data từ Login response...",
+          );
+          setCurrentUser({
+            email: email,
+            name: loginData.name || "User", // Lấy tên "skibidi" từ server gửi về lúc nãy
+            description: "Default ID",
+          });
+        } else {
+          // Nếu server trả về Profile xịn thì dùng luôn
+          setCurrentUser(profileData);
+        }
+
+        await fetchAllPosts();
+        setIsLoading(false);
+        return true;
+      } else {
+        setIsLoading(false);
+        Alert.alert("Login Failed", "Check your email/password");
+        return false;
+      }
+    } catch (error) {
+      setIsLoading(false);
+      Alert.alert("Error", "Server is offline");
+      return false;
     }
-    return false;
+  };
+
+  const handleRegister = async (newUser) => {
+    try {
+      const response = await fetch(`${BASE_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: newUser.email,
+          password: newUser.password,
+          name: newUser.name,
+          description: newUser.userId,
+        }),
+      });
+      return response.ok;
+    } catch (e) {
+      return false;
+    }
   };
 
   const handleAddPost = async (content) => {
-    if (!currentUser || !db) return;
-    await db.runAsync(
-      "INSERT INTO posts (userId, description, timeValue) VALUES (?, ?, ?)",
-      [currentUser.userId, content, Date.now()],
-    );
-    await refreshData(db);
+    console.log("--- DEBUG POST ---");
+    console.log("1. Dữ liệu User hiện tại:", currentUser);
+    console.log("2. Nội dung bài đăng:", content);
+
+    // Kiểm tra xem User đã đăng nhập và có Email chưa
+    if (!currentUser?.email) {
+      console.log("LỖI: currentUser rỗng hoặc không có email!");
+      Alert.alert("Error", "User info not found. Please re-login.");
+      return;
+    }
+
+    const postPayload = {
+      title: "Post by " + (currentUser.name || "User"),
+      description: content,
+      creator_email: currentUser.email,
+    };
+
+    console.log("3. Gửi Payload lên Server:", JSON.stringify(postPayload));
+
+    try {
+      const res = await fetch(`${BASE_URL}/posts`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "Content-Type": "application/json", // BẮT BUỘC
+        },
+        body: JSON.stringify(postPayload),
+      });
+
+      console.log("4. Trạng thái HTTP từ Server:", res.status);
+
+      const resData = await res.json();
+      console.log("5. Phản hồi từ Server:", resData);
+
+      if (res.ok) {
+        console.log("6. ĐĂNG BÀI THÀNH CÔNG!");
+        await fetchAllPosts(); // Tải lại danh sách
+      } else {
+        console.log("6. ĐĂNG BÀI THẤT BẠI (Lỗi Logic):", resData);
+        Alert.alert(
+          "Server Error",
+          resData.detail?.[0]?.msg || "Failed to post",
+        );
+      }
+    } catch (e) {
+      console.log("6. LỖI KẾT NỐI MẠNG:", e);
+      Alert.alert("Network Error", "Cannot connect to server.");
+    }
+    console.log("------------------");
   };
 
-  const handleAddComment = async (postId, content) => {
-    if (!currentUser || !db) return;
-    await db.runAsync(
-      "INSERT INTO comments (postId, userId, content, timeValue) VALUES (?, ?, ?, ?)",
-      [postId, currentUser.userId, content, Date.now()],
-    );
-    await refreshData(db);
-  };
+  const handleDeletePost = async (postId) => {
+  try {
+    const res = await fetch(`${BASE_URL}/posts/${postId}`, {
+      method: "DELETE",
+      headers: { accept: "application/json" },
+    });
 
-  const handleUpdateUser = async (updatedInfo) => {
-    if (!db) return;
-    await db.runAsync(
-      "UPDATE users SET name = ?, address = ?, avatarUrl = ?, description = ? WHERE userId = ?",
-      [
-        updatedInfo.name,
-        updatedInfo.address,
-        updatedInfo.avatarUrl,
-        updatedInfo.description,
-        updatedInfo.userId,
-      ],
-    );
-    setCurrentUser(updatedInfo);
-  };
-
-  if (isLoading) return null;
+    if (res.ok) {
+      Alert.alert("Success", "Post deleted successfully!");
+      await fetchAllPosts();
+    } else {
+      const errorData = await res.json();
+      Alert.alert("Error", errorData.detail || "Cannot delete this post");
+    }
+  } catch (e) {
+    console.log("Delete error:", e);
+    Alert.alert("Error", "Server connection failed");
+  }
+};
 
   function MainTabs() {
     return (
@@ -190,8 +194,6 @@ export default function App() {
             );
           },
           tabBarActiveTintColor: "#1877f2",
-          tabBarInactiveTintColor: "gray",
-          tabBarStyle: { height: 65, paddingBottom: 10 },
         })}
       >
         <Tab.Screen name="Home">
@@ -199,20 +201,19 @@ export default function App() {
             <Home
               {...props}
               listPosts={listPosts}
-              listComments={listComments}
-              currentUser={currentUser}
               onPost={handleAddPost}
-              onComment={handleAddComment}
+              onDelete={handleDeletePost}
+              onRefresh={fetchAllPosts}
+              currentUser={currentUser}
             />
           )}
         </Tab.Screen>
         <Tab.Screen name="Profile">
           {(props) => (
             <Profile
-              key={currentUser?.userId}
+              key={currentUser?.email}
               {...props}
               currentUser={currentUser}
-              onSave={handleUpdateUser}
             />
           )}
         </Tab.Screen>
@@ -230,7 +231,9 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login">
-            {(props) => <Login {...props} onLogin={handleLogin} />}
+            {(props) => (
+              <Login {...props} onLogin={handleLogin} isLoading={isLoading} />
+            )}
           </Stack.Screen>
           <Stack.Screen name="Register">
             {(props) => <Register {...props} onRegister={handleRegister} />}

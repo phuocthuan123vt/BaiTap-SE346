@@ -2,9 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   Keyboard,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -12,102 +14,153 @@ import {
   View,
 } from "react-native";
 
-const Home = ({ listPosts, listComments, onPost, onComment, currentUser }) => {
-  const [postText, setPostText] = useState("");
-  const [commentInputs, setCommentInputs] = useState({});
+const Home = ({
+  navigation,
+  listPosts,
+  onPost,
+  onDelete,
+  onRefresh,
+  currentUser,
+}) => {
+  const [text, setText] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleSendPost = () => {
-    if (postText.trim() === "") return;
-    onPost(postText);
-    setPostText("");
+  // Xử lý đăng bài
+  const handleSend = () => {
+    if (text.trim().length === 0) return;
+    onPost(text);
+    setText("");
     Keyboard.dismiss();
   };
 
-  const handleSendComment = (postId) => {
-    const text = commentInputs[postId];
-    if (!text || text.trim() === "") return;
-    onComment(postId, text);
-    setCommentInputs({ ...commentInputs, [postId]: "" });
-    Keyboard.dismiss();
+  // Xử lý kéo xuống để làm mới danh sách
+  const onPullToRefresh = async () => {
+    setRefreshing(true);
+    if (onRefresh) await onRefresh();
+    setRefreshing(false);
   };
 
-  const renderItem = ({ item }) => {
-    const myComments = listComments.filter((c) => c.postId === item.id);
+  // Xác nhận trước khi xóa bài
+  const confirmDelete = (postId) => {
+    Alert.alert("Delete Post", "Are you sure you want to remove this post?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        onPress: () => onDelete(postId),
+        style: "destructive",
+      },
+    ]);
+  };
 
-    return (
-      <LinearGradient
-        colors={["#f09433", "#dc2743", "#bc1888"]}
-        style={styles.gradientWrapper}
-      >
-        <View style={styles.postCard}>
-          <View style={styles.postHeader}>
+  const renderItem = ({ item }) => (
+    <LinearGradient
+      colors={["#f09433", "#dc2743", "#bc1888"]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.gradientWrapper}
+    >
+      <View style={styles.postCard}>
+        {/* Header bài đăng */}
+        <View style={styles.postHeader}>
+          <View style={styles.userInfo}>
             <Image
               source={{
-                uri: `https://ui-avatars.com/api/?name=${item.userId}`,
+                uri: `https://ui-avatars.com/api/?name=${item.creator_name || "U"}&background=random`,
               }}
               style={styles.avatar}
             />
             <View style={{ marginLeft: 10 }}>
-              <Text style={styles.userIdText}>{item.userId}</Text>
-              <Text style={styles.timeText}>
-                {new Date(item.timeValue).toLocaleString()}
+              <Text style={styles.userNameText}>
+                {item.creator_name || "Unknown"}
               </Text>
+              <Text style={styles.timeText}>{item.created_at}</Text>
             </View>
           </View>
 
+          {/* Nút Xóa bài viết */}
+          <TouchableOpacity onPress={() => confirmDelete(item.id)}>
+            <Ionicons name="trash-outline" size={20} color="#ff4d4d" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Nội dung bài đăng */}
+        <View style={styles.postBody}>
+          {item.title && <Text style={styles.postTitleText}>{item.title}</Text>}
           <Text style={styles.descText}>{item.description}</Text>
+        </View>
 
-          {/* HIỂN THỊ DANH SÁCH COMMENT */}
-          <View style={styles.commentSection}>
-            {myComments.map((c) => (
-              <View key={c.id} style={styles.commentBox}>
-                <Text style={styles.commentUser}>{c.userId}: </Text>
-                <Text style={styles.commentContent}>{c.content}</Text>
-              </View>
-            ))}
+        {/* Footer tương tác giả */}
+        <View style={styles.postFooter}>
+          <View style={styles.footerAction}>
+            <Ionicons name="heart-outline" size={24} color="black" />
+            <Text style={styles.actionText}>Like</Text>
           </View>
-
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.miniInput}
-              placeholder="Write a comment..."
-              value={commentInputs[item.id] || ""}
-              onChangeText={(val) =>
-                setCommentInputs({ ...commentInputs, [item.id]: val })
-              }
-            />
-            <TouchableOpacity onPress={() => handleSendComment(item.id)}>
-              <Ionicons name="send" size={20} color="#1877f2" />
-            </TouchableOpacity>
+          <View style={[styles.footerAction, { marginLeft: 20 }]}>
+            <Ionicons name="chatbubble-outline" size={22} color="black" />
+            <Text style={styles.actionText}>Comment</Text>
           </View>
         </View>
-      </LinearGradient>
-    );
-  };
+      </View>
+    </LinearGradient>
+  );
 
   return (
     <View style={styles.container}>
+      {/* Header trang Feed */}
       <View style={styles.mainHeader}>
-        <Text style={styles.mainTitle}>Feed</Text>
-      </View>
-
-      <View style={styles.createPostContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="What's on your mind?"
-          value={postText}
-          onChangeText={setPostText}
-        />
-        <TouchableOpacity style={styles.postBtn} onPress={handleSendPost}>
-          <Text style={{ color: "white" }}>Post</Text>
+        <Text style={styles.mainTitle}>Feed API</Text>
+        <TouchableOpacity onPress={() => navigation.navigate("Profile")}>
+          <Image
+            source={{
+              uri:
+                currentUser?.avatarUrl ||
+                "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+            }}
+            style={styles.topAvatar}
+          />
         </TouchableOpacity>
       </View>
 
+      {/* Ô nhập bài đăng kiểu Facebook */}
+      <View style={styles.createPostContainer}>
+        <Image
+          source={{
+            uri:
+              currentUser?.avatarUrl ||
+              "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+          }}
+          style={styles.inputAvatar}
+        />
+        <TextInput
+          style={styles.textInput}
+          placeholder="What's on your mind?"
+          placeholderTextColor="#8e8e8e"
+          value={text}
+          onChangeText={setText}
+          multiline
+        />
+        {text.trim().length > 0 && (
+          <TouchableOpacity style={styles.postBtn} onPress={handleSend}>
+            <Text style={styles.postBtnText}>Post</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Danh sách bài đăng */}
       <FlatList
         data={listPosts}
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onPullToRefresh} />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyBox}>
+            <Text style={{ color: "gray" }}>No posts available.</Text>
+          </View>
+        }
       />
     </View>
   );
@@ -115,59 +168,106 @@ const Home = ({ listPosts, listComments, onPost, onComment, currentUser }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f0f2f5" },
+
+  // Header Style
   mainHeader: {
-    paddingTop: 50,
-    paddingBottom: 10,
-    backgroundColor: "white",
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 55,
+    paddingBottom: 12,
+    backgroundColor: "white",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#ddd",
   },
-  mainTitle: { fontSize: 24, fontWeight: "bold" },
+  mainTitle: { fontSize: 26, fontWeight: "900", color: "#1877f2" },
+  topAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#eee",
+  },
+
+  // Create Post Area Style
   createPostContainer: {
     flexDirection: "row",
-    padding: 10,
+    alignItems: "center",
     backgroundColor: "white",
-    marginBottom: 10,
+    padding: 12,
+    marginBottom: 5,
+    elevation: 2,
   },
+  inputAvatar: { width: 40, height: 40, borderRadius: 20 },
   textInput: {
     flex: 1,
     backgroundColor: "#f0f2f5",
     borderRadius: 20,
     paddingHorizontal: 15,
-    marginRight: 10,
+    paddingVertical: 8,
+    marginHorizontal: 10,
+    fontSize: 15,
+    maxHeight: 100,
   },
-  postBtn: { backgroundColor: "#1877f2", padding: 10, borderRadius: 20 },
+  postBtn: {
+    backgroundColor: "#1877f2",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
+  },
+  postBtnText: { color: "white", fontWeight: "bold" },
 
+  // Post Card Style (Modern & Radiant)
   gradientWrapper: {
     marginHorizontal: 12,
     marginTop: 15,
     padding: 1.5,
-    borderRadius: 15,
+    borderRadius: 16,
+    // Đổ bóng cho Android & iOS
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  postCard: { backgroundColor: "white", borderRadius: 14, padding: 12 },
-  postHeader: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  avatar: { width: 30, height: 30, borderRadius: 15 },
-  userIdText: { fontWeight: "bold", fontSize: 13 },
-  timeText: { fontSize: 9, color: "gray" },
-  descText: { fontSize: 15, marginBottom: 10 },
+  postCard: { backgroundColor: "white", borderRadius: 15, padding: 15 },
+  postHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  userInfo: { flexDirection: "row", alignItems: "center" },
+  avatar: { width: 38, height: 38, borderRadius: 19 },
+  userNameText: { fontWeight: "bold", fontSize: 15, color: "#050505" },
+  timeText: { fontSize: 11, color: "#65676b" },
 
-  commentSection: {
+  postBody: { marginBottom: 15 },
+  postTitleText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#1877f2",
+    marginBottom: 4,
+  },
+  descText: { fontSize: 16, color: "#1c1e21", lineHeight: 22 },
+
+  postFooter: {
+    flexDirection: "row",
     borderTopWidth: 0.5,
     borderTopColor: "#eee",
-    paddingTop: 8,
-  },
-  commentBox: { flexDirection: "row", marginBottom: 4 },
-  commentUser: { fontWeight: "bold", fontSize: 12 },
-  commentContent: { fontSize: 12, color: "#333" },
-
-  commentInputRow: {
-    flexDirection: "row",
+    paddingTop: 12,
     alignItems: "center",
-    marginTop: 10,
-    backgroundColor: "#f0f2f5",
-    borderRadius: 10,
-    paddingHorizontal: 8,
   },
-  miniInput: { flex: 1, height: 40, fontSize: 12 },
+  footerAction: { flexDirection: "row", alignItems: "center" },
+  actionText: {
+    marginLeft: 6,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#65676b",
+  },
+
+  emptyBox: { marginTop: 50, alignItems: "center" },
 });
 
 export default Home;
